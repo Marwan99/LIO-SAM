@@ -1,25 +1,25 @@
 lio_sam:
 
   # Topics
-  pointCloudTopic: "/os1_cloud_node/points"     # Point cloud data
+  pointCloudTopic: "/os_cloud_node/points"      # Point cloud data
   imuTopic: "/imu/data"                         # IMU data
   odomTopic: "odometry/imu"                     # IMU pre-preintegration odometry, same frequency as IMU
   gpsTopic: "odometry/gpsz"                     # GPS odometry topic from navsat, see module_navsat.launch file
 
-  readBag: "/media/marwan/external_drive/aggressive_manoeuvres/angular_aggressive_0.bag"
+  readBag: "/media/marwan/external_drive/aggressive_manoeuvres/post_ouster_pkg_update/rotation_experiments/rotation_experiment_location_1_2021-01-26-23-55-44.bag"
   writeBag: "/home/marwan/lol.bag"
   
-  LMOMaxIterations: 50                          # 60 --> works, 30 --> fails
+  LMOMaxIterations: 30                          # 60 --> works, 30 --> fails
   # loopRate: 70.0
 
   # Frames
-  lidarFrame: "os1_lidar"
+  lidarFrame: "os_sensor"
   baselinkFrame: "base_link"
   odometryFrame: "odom"
   mapFrame: "map"
 
   # GPS Settings
-  useImuHeadingInitialization: true           # if using GPS data, set to "true"
+  useImuHeadingInitialization: false          # if using GPS data, set to "true"
   useGpsElevation: false                      # if GPS elevation is bad, set to "false"
   gpsCovThreshold: 2.0                        # m^2, threshold for using GPS data
   poseCovThreshold: 25.0                      # m^2, threshold for using GPS data
@@ -37,15 +37,15 @@ lio_sam:
   lidarMaxRange: 200.0                       # default: 1000.0, maximum lidar range to be used
 
   # IMU Settings
-  imuAccNoise: 3.9939570888238808e-03
-  imuGyrNoise: 1.5636343949698187e-03
-  imuAccBiasN: 6.4356659353532566e-05
-  imuGyrBiasN: 3.5640318696367613e-05
+  imuAccNoise: 1.2154843674317246e-02
+  imuGyrNoise: 2.5532119453813736e-03
+  imuAccBiasN: 3.1134284621039883e-04
+  imuGyrBiasN: 3.9069248285250210e-05
   imuGravity: 9.80511
   imuRPYWeight: 0.01
 
   # Extrinsics (lidar -> IMU)
-  extrinsicTrans: [0.0, 0.0, 0.0]
+  extrinsicTrans: [0.16589, 0.0, -0.29841]
   # extrinsicRot: [-1, 0, 0,
   #                 0, 1, 0,
   #                 0, 0, -1]
@@ -85,7 +85,7 @@ lio_sam:
   surroundingKeyframeSearchRadius: 50.0         # meters, within n meters scan-to-map optimization (when loop closure disabled)
 
   # Loop closure
-  loopClosureEnableFlag: false
+  loopClosureEnableFlag: true
   loopClosureFrequency: 1.0                     # Hz, regulate loop closure constraint add frequency
   surroundingKeyframeSize: 50                   # submap size (when loop closure enabled)
   historyKeyframeSearchRadius: 15.0             # meters, key frame that is within n meters from current pose will be considerd for loop closure
@@ -95,8 +95,8 @@ lio_sam:
 
   # Visualization
   globalMapVisualizationSearchRadius: 1000.0    # meters, global map visualization radius
-  globalMapVisualizationPoseDensity: 10.0       # meters, global map visualization keyframe density
-  globalMapVisualizationLeafSize: 0.2           # meters, global map visualization cloud density
+  globalMapVisualizationPoseDensity: 1.0        # meters, global map visualization keyframe density
+  globalMapVisualizationLeafSize: 0.1           # meters, global map visualization cloud density
 
 
 
