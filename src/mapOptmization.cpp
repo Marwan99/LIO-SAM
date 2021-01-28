@@ -613,10 +613,6 @@ void mapOptimization::updateInitialGuess()
             temp_pose.pitch = transformTobeMapped[1];
             temp_pose.yaw   = transformTobeMapped[2];
 
-            cout << "cloud key poses size: init="
-                << cloudInfo.initialGuessYaw << " tf="
-                << temp_pose.yaw << "\n"; 
-
             pcl::PointCloud<PointType>::Ptr tf_cloud;
             tf_cloud = transformPointCloud(laserCloudSurfLast,  &temp_pose);
             publishCloud(&debug_transformed_cloud, tf_cloud, timeLaserInfoStamp, odometryFrame);
@@ -624,6 +620,22 @@ void mapOptimization::updateInitialGuess()
             std_msgs::Float64 temp_msg;
             temp_msg.data = cloudInfo.initialGuessYaw;
             pubRawYaw.publish(temp_msg);
+
+            Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->back());
+            Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
+            float x, y, z, roll, pitch, yaw;
+            pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
+
+            if(abs(yaw) > 0.2) // 11.5 deg
+            {
+                cout << "Yaw estimation off detected: delta="
+                    << yaw * 180.0 / 3.14 << "deg.\n"; 
+            
+                string temp;
+                cin >> temp;
+                if(temp == "end")
+                    std::terminate();
+            }
 
             return;
         }
