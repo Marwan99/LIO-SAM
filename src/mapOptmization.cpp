@@ -621,21 +621,8 @@ void mapOptimization::updateInitialGuess()
             temp_msg.data = cloudInfo.initialGuessYaw;
             pubRawYaw.publish(temp_msg);
 
-            Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->back());
-            Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
             float x, y, z, roll, pitch, yaw;
-            pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
-
-            if(abs(yaw) > 0.2) // 11.5 deg
-            {
-                cout << "Yaw estimation off detected: delta="
-                    << yaw * 180.0 / 3.14 << "deg.\n"; 
-            
-                string temp;
-                cin >> temp;
-                if(temp == "end")
-                    std::terminate();
-            }
+            pcl::getTranslationAndEulerAngles(transIncre, x, y, z, roll, pitch, imu_pre_yaw_estimation);          
 
             return;
         }
@@ -1182,6 +1169,8 @@ bool mapOptimization::saveFrame()
     Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
     float x, y, z, roll, pitch, yaw;
     pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
+    
+    loam_yaw_estimation = yaw;
 
     if (abs(roll)  < surroundingkeyframeAddingAngleThreshold &&
         abs(pitch) < surroundingkeyframeAddingAngleThreshold && 
@@ -1351,9 +1340,9 @@ void mapOptimization::saveKeyFramesAndFactor()
     // cout << "****************************************************" << endl;
     // isamCurrentEstimate.print("Current estimate: ");
 
-    // thisPose3D.x = latestEstimate.translation().x();
-    // thisPose3D.y = latestEstimate.translation().y();
-    // thisPose3D.z = latestEstimate.translation().z();
+    thisPose3D.x = latestEstimate.translation().x();
+    thisPose3D.y = latestEstimate.translation().y();
+    thisPose3D.z = latestEstimate.translation().z();
     thisPose3D.x = transformTobeMapped[3];
     thisPose3D.y = transformTobeMapped[4];
     thisPose3D.z = transformTobeMapped[5];
@@ -1364,14 +1353,36 @@ void mapOptimization::saveKeyFramesAndFactor()
     thisPose6D.y = thisPose3D.y;
     thisPose6D.z = thisPose3D.z;
     thisPose6D.intensity = thisPose3D.intensity ; // this can be used as index
-    // thisPose6D.roll  = latestEstimate.rotation().roll();
-    // thisPose6D.pitch = latestEstimate.rotation().pitch();
-    // thisPose6D.yaw   = latestEstimate.rotation().yaw();
-    thisPose6D.roll  = transformTobeMapped[0];
-    thisPose6D.pitch = transformTobeMapped[1];
-    thisPose6D.yaw   = transformTobeMapped[2];
+    thisPose6D.roll  = latestEstimate.rotation().roll();
+    thisPose6D.pitch = latestEstimate.rotation().pitch();
+    thisPose6D.yaw   = latestEstimate.rotation().yaw();
+    // thisPose6D.roll  = transformTobeMapped[0];
+    // thisPose6D.pitch = transformTobeMapped[1];
+    // thisPose6D.yaw   = transformTobeMapped[2];
     thisPose6D.time = timeLaserInfoCur;
     cloudKeyPoses6D->push_back(thisPose6D);
+
+    if(cloudKeyPoses6D->size() > 1)
+    {
+        Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->points[cloudKeyPoses6D->size()-2]);
+        Eigen::Affine3f transFinal = pclPointToAffine3f(thisPose6D);
+        Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
+        float x, y, z, roll, pitch;
+        pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, isam_yaw_estimation);
+
+        if(abs(imu_pre_yaw_estimation - loam_yaw_estimation) > 0.07)
+        {
+            cout << "Yaw estimations:\n"
+                << "pre-int=" << imu_pre_yaw_estimation * 180.0 / 3.14 << endl
+                << "loam=" << loam_yaw_estimation * 180.0 / 3.14 << endl
+                << "isam=" << isam_yaw_estimation * 180.0 / 3.14 << endl;
+
+            string temp;
+            cin >> temp;
+            if(temp == "end")
+                std::terminate();
+        }
+    }
 
     // cout << "****************************************************" << endl;
     // cout << "Pose covariance:" << endl;
@@ -1379,12 +1390,12 @@ void mapOptimization::saveKeyFramesAndFactor()
     poseCovariance = isam->marginalCovariance(isamCurrentEstimate.size()-1);
 
     // save updated transform
-    // transformTobeMapped[0] = latestEstimate.rotation().roll();
-    // transformTobeMapped[1] = latestEstimate.rotation().pitch();
-    // transformTobeMapped[2] = latestEstimate.rotation().yaw();
-    // transformTobeMapped[3] = latestEstimate.translation().x();
-    // transformTobeMapped[4] = latestEstimate.translation().y();
-    // transformTobeMapped[5] = latestEstimate.translation().z();
+    transformTobeMapped[0] = latestEstimate.rotation().roll();
+    transformTobeMapped[1] = latestEstimate.rotation().pitch();
+    transformTobeMapped[2] = latestEstimate.rotation().yaw();
+    transformTobeMapped[3] = latestEstimate.translation().x();
+    transformTobeMapped[4] = latestEstimate.translation().y();
+    transformTobeMapped[5] = latestEstimate.translation().z();
 
     // save all the received edge and surf points
     pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(new pcl::PointCloud<PointType>());

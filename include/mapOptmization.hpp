@@ -50,6 +50,9 @@ class mapOptimization : public ParamServer
 {
 
 public:
+    float imu_pre_yaw_estimation;
+    float loam_yaw_estimation;
+    float isam_yaw_estimation;
 
     // gtsam
     NonlinearFactorGraph gtSAMgraph;
