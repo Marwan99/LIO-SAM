@@ -118,6 +118,7 @@ IMUPreintegration::IMUPreintegration()
     // subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5, &IMUPreintegration::odometryHandler, this, ros::TransportHints().tcpNoDelay());
 
     // pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic+"_incremental", 2000); // odometry/imu_incremental
+    pubImuBias = nh.advertise<std_msgs::Float64MultiArray>("imu_bias_debug", 2000);
 
     boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
     p->accelerometerCovariance  = gtsam::Matrix33::Identity(3,3) * pow(imuAccNoise, 2); // acc white noise in continuous
@@ -315,6 +316,17 @@ void IMUPreintegration::odometryHandler(const nav_msgs::Odometry::ConstPtr& odom
     // 2. after optiization, re-propagate imu odometry preintegration
     prevStateOdom = prevState_;
     prevBiasOdom  = prevBias_;
+
+    // publish imu bias estimation for debugging
+    std_msgs::Float64MultiArray bias_debug_msg;
+    bias_debug_msg.data.push_back(prevBiasOdom.accelerometer().x());
+    bias_debug_msg.data.push_back(prevBiasOdom.accelerometer().y());
+    bias_debug_msg.data.push_back(prevBiasOdom.accelerometer().z());
+    bias_debug_msg.data.push_back(prevBiasOdom.gyroscope().x());
+    bias_debug_msg.data.push_back(prevBiasOdom.gyroscope().y());
+    bias_debug_msg.data.push_back(prevBiasOdom.gyroscope().z());
+    pubImuBias.publish(bias_debug_msg);
+
     // first pop imu message older than current correction data
     double lastImuQT = -1;
     while (!imuQueImu.empty() && ROS_TIME(&imuQueImu.front()) < currentCorrectionTime - delta_t)

@@ -59,6 +59,7 @@ public:
     ros::Subscriber subImu;
     ros::Subscriber subOdometry;
     ros::Publisher pubImuOdometry;
+    ros::Publisher pubImuBias;
 
     bool systemInitialized = false;
 
