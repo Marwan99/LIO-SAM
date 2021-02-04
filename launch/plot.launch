@@ -5,6 +5,22 @@
             /odometry/imu/pose/pose/position/x
             /odometry/imu/pose/pose/position/y" /> -->
     
-    <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot" 
-        args="/yaw/imu /yaw/lidar /debug/raw_yaw" />
+    <!-- IMU bias -->
+    <!-- <node pkg="rqt_plot" type="rqt_plot" name="bias_plot" 
+        args="/imu_bias_debug/data[0]
+        /imu_bias_debug/data[1]
+        /imu_bias_debug/data[3]
+        /imu_bias_debug/data[4]
+        /imu_bias_debug/data[5]"/> -->
+    
+    <!-- Detla estimations -->
+    <node pkg="rqt_plot" type="rqt_plot" name="delta_estimation_plot" 
+        args="
+        /delta_estimations/data[0]
+        /delta_estimations/data[1]
+        /delta_estimations/data[5]"/>
+        <!-- /delta_estimations/data[3]
+        /delta_estimations/data[4]
+        /delta_estimations/data[5] -->
+
 </launch>

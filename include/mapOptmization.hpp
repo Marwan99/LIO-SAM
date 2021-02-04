@@ -50,10 +50,10 @@ class mapOptimization : public ParamServer
 {
 
 public:
-    float imu_pre_yaw_estimation;
-    float loam_yaw_estimation;
-    float isam_yaw_estimation;
-
+    float imu_pre_inc[6] = {0};
+    float loam_inc[6] = {0};
+    bool loam_converged=true;
+    
     // gtsam
     NonlinearFactorGraph gtSAMgraph;
     Values initialEstimate;
@@ -76,8 +76,9 @@ public:
     ros::Publisher pubLoopConstraintEdge;
     ros::Publisher map_extracted_surf;
     ros::Publisher map_extracted_cor;
-    ros::Publisher debug_transformed_cloud;
-    ros::Publisher pubRawYaw;
+    ros::Publisher imu_pre_int_debug_transformed_cloud;
+    ros::Publisher loam_debug_transformed_cloud;
+    ros::Publisher deltaEstimation;
 
     ros::Subscriber subCloud;
     ros::Subscriber subGPS;
@@ -155,6 +156,7 @@ public:
     Eigen::Affine3f transPointAssociateToMap;
     Eigen::Affine3f incrementalOdometryAffineFront;
     Eigen::Affine3f incrementalOdometryAffineBack;
+    Eigen::Affine3f incrementalPreIntAffineBack;
 
     boost::shared_ptr<nav_msgs::Odometry> pubLaserOdometryGlobalPtr;
     boost::shared_ptr<nav_msgs::Odometry> pubLaserOdometryIncrementalPtr;
@@ -247,4 +249,6 @@ public:
     void publishOdometry();
 
     void publishFrames();
+
+    void debug();
 };

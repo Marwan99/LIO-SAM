@@ -32,10 +32,11 @@ mapOptimization::mapOptimization()
     pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);  // rviz visualization
     pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/lio_sam/mapping/loop_closure_constraints", 1);  // rviz visualization
  
-    pubRawYaw = nh.advertise<std_msgs::Float64>("debug/raw_yaw", 1);
+    deltaEstimation = nh.advertise<std_msgs::Float64MultiArray>("/delta_estimations", 1);
     map_extracted_cor = nh.advertise<sensor_msgs::PointCloud2>("debug/map_cor_keypoints", 1);
     map_extracted_surf = nh.advertise<sensor_msgs::PointCloud2>("debug/map_surf_keypoints", 1);
-    debug_transformed_cloud = nh.advertise<sensor_msgs::PointCloud2>("debug/tf_init", 1);
+    imu_pre_int_debug_transformed_cloud = nh.advertise<sensor_msgs::PointCloud2>("/debug/imu_pre_int_cloud", 1);
+    loam_debug_transformed_cloud = nh.advertise<sensor_msgs::PointCloud2>("/debug/loam_opt_cloud", 1);
 
     pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 1);  // rviz visualization
     pubRecentKeyFrame = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered", 1);  // rviz visualization
@@ -125,6 +126,10 @@ void mapOptimization::laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& m
         publishOdometry();
 
         publishFrames();
+
+        publishGlobalMap();  // Added here for consistency instead of running in a diffrent thread
+
+        debug();
     }
 }
 
@@ -203,7 +208,7 @@ void mapOptimization::visualizeGlobalMapThread()
     ros::Rate rate(0.2);
     while (ros::ok()){
         rate.sleep();
-        publishGlobalMap();
+        // publishGlobalMap();
     }
 
     if (savePCD == false)
@@ -253,9 +258,9 @@ void mapOptimization::publishGlobalMap()
     if (cloudKeyPoses3D->points.empty() == true)
         return;
 
-    pcl::KdTreeFLANN<PointType>::Ptr kdtreeGlobalMap(new pcl::KdTreeFLANN<PointType>());;
-    pcl::PointCloud<PointType>::Ptr globalMapKeyPoses(new pcl::PointCloud<PointType>());
-    pcl::PointCloud<PointType>::Ptr globalMapKeyPosesDS(new pcl::PointCloud<PointType>());
+    // pcl::KdTreeFLANN<PointType>::Ptr kdtreeGlobalMap(new pcl::KdTreeFLANN<PointType>());;
+    // pcl::PointCloud<PointType>::Ptr globalMapKeyPoses(new pcl::PointCloud<PointType>());
+    // pcl::PointCloud<PointType>::Ptr globalMapKeyPosesDS(new pcl::PointCloud<PointType>());
     pcl::PointCloud<PointType>::Ptr globalMapKeyFrames(new pcl::PointCloud<PointType>());
     pcl::PointCloud<PointType>::Ptr globalMapKeyFramesDS(new pcl::PointCloud<PointType>());
 
@@ -263,24 +268,24 @@ void mapOptimization::publishGlobalMap()
     std::vector<int> pointSearchIndGlobalMap;
     std::vector<float> pointSearchSqDisGlobalMap;
     // search near key frames to visualize
-    mtx.lock();
-    kdtreeGlobalMap->setInputCloud(cloudKeyPoses3D);
-    kdtreeGlobalMap->radiusSearch(cloudKeyPoses3D->back(), globalMapVisualizationSearchRadius, pointSearchIndGlobalMap, pointSearchSqDisGlobalMap, 0);
-    mtx.unlock();
+    // mtx.lock();
+    // kdtreeGlobalMap->setInputCloud(cloudKeyPoses3D);
+    // kdtreeGlobalMap->radiusSearch(cloudKeyPoses3D->back(), globalMapVisualizationSearchRadius, pointSearchIndGlobalMap, pointSearchSqDisGlobalMap, 0);
+    // mtx.unlock();
 
-    for (int i = 0; i < (int)pointSearchIndGlobalMap.size(); ++i)
-        globalMapKeyPoses->push_back(cloudKeyPoses3D->points[pointSearchIndGlobalMap[i]]);
+    // for (int i = 0; i < (int)pointSearchIndGlobalMap.size(); ++i)
+    //     globalMapKeyPoses->push_back(cloudKeyPoses3D->points[pointSearchIndGlobalMap[i]]);
     // downsample near selected key frames
-    pcl::VoxelGrid<PointType> downSizeFilterGlobalMapKeyPoses; // for global map visualization
-    downSizeFilterGlobalMapKeyPoses.setLeafSize(globalMapVisualizationPoseDensity, globalMapVisualizationPoseDensity, globalMapVisualizationPoseDensity); // for global map visualization
-    downSizeFilterGlobalMapKeyPoses.setInputCloud(globalMapKeyPoses);
-    downSizeFilterGlobalMapKeyPoses.filter(*globalMapKeyPosesDS);
+    // pcl::VoxelGrid<PointType> downSizeFilterGlobalMapKeyPoses; // for global map visualization
+    // downSizeFilterGlobalMapKeyPoses.setLeafSize(globalMapVisualizationPoseDensity, globalMapVisualizationPoseDensity, globalMapVisualizationPoseDensity); // for global map visualization
+    // downSizeFilterGlobalMapKeyPoses.setInputCloud(globalMapKeyPoses);
+    // downSizeFilterGlobalMapKeyPoses.filter(*globalMapKeyPosesDS);
 
     // extract visualized and downsampled key frames
-    for (int i = 0; i < (int)globalMapKeyPosesDS->size(); ++i){
-        if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius)
-            continue;
-        int thisKeyInd = (int)globalMapKeyPosesDS->points[i].intensity;
+    for (int i = 0; i < (int)cloudKeyPoses3D->size(); ++i){
+        // if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius)
+        //     continue;
+        int thisKeyInd = (int)cloudKeyPoses3D->points[i].intensity;
         *globalMapKeyFrames += *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
         *globalMapKeyFrames += *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
     }
@@ -290,7 +295,7 @@ void mapOptimization::publishGlobalMap()
     downSizeFilterGlobalMapKeyFrames.setInputCloud(globalMapKeyFrames);
     downSizeFilterGlobalMapKeyFrames.filter(*globalMapKeyFramesDS);
     globalMapToSave = publishCloud(&pubLaserCloudSurround, globalMapKeyFramesDS, timeLaserInfoStamp, odometryFrame);
-    ROS_ERROR_STREAM("LOOL " << globalMapToSave.header.frame_id);
+    // ROS_ERROR_STREAM("LOOL " << globalMapToSave.header.frame_id);
 }
 
 void mapOptimization::loopClosureThread()
@@ -582,7 +587,7 @@ void mapOptimization::updateInitialGuess()
         lastImuTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
         return;
     }
-
+    
     // use imu pre-integration estimation for pose guess
     static bool lastImuPreTransAvailable = false;
     static Eigen::Affine3f lastImuPreTransformation;
@@ -602,27 +607,18 @@ void mapOptimization::updateInitialGuess()
                                                             transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
 
             lastImuPreTransformation = transBack;
+            incrementalPreIntAffineBack = transFinal;
 
             lastImuTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
 
-            PointTypePose temp_pose;
-            temp_pose.x = transformTobeMapped[3];
-            temp_pose.y = transformTobeMapped[4];
-            temp_pose.z = transformTobeMapped[5];
-            temp_pose.roll  = transformTobeMapped[0];
-            temp_pose.pitch = transformTobeMapped[1];
-            temp_pose.yaw   = transformTobeMapped[2];
 
+            // Publish cloud using ime pre-integration tf estimation
+            PointTypePose temp_pose = trans2PointTypePose(transformTobeMapped);
             pcl::PointCloud<PointType>::Ptr tf_cloud;
             tf_cloud = transformPointCloud(laserCloudSurfLast,  &temp_pose);
-            publishCloud(&debug_transformed_cloud, tf_cloud, timeLaserInfoStamp, odometryFrame);
+            publishCloud(&imu_pre_int_debug_transformed_cloud, tf_cloud, timeLaserInfoStamp, odometryFrame);
 
-            std_msgs::Float64 temp_msg;
-            temp_msg.data = cloudInfo.initialGuessYaw;
-            pubRawYaw.publish(temp_msg);
-
-            float x, y, z, roll, pitch, yaw;
-            pcl::getTranslationAndEulerAngles(transIncre, x, y, z, roll, pitch, imu_pre_yaw_estimation);          
+            pcl::getTranslationAndEulerAngles(transIncre, imu_pre_inc[0], imu_pre_inc[1], imu_pre_inc[2], imu_pre_inc[3], imu_pre_inc[4], imu_pre_inc[5]);
 
             return;
         }
@@ -640,6 +636,17 @@ void mapOptimization::updateInitialGuess()
                                                         transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
 
         lastImuTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
+
+        // Debug
+        incrementalPreIntAffineBack = transFinal;
+        pcl::getTranslationAndEulerAngles(transIncre, imu_pre_inc[0], imu_pre_inc[1], imu_pre_inc[2], imu_pre_inc[3], imu_pre_inc[4], imu_pre_inc[5]);
+
+        // Publish cloud using ime pre-integration tf estimation
+        PointTypePose temp_pose = trans2PointTypePose(transformTobeMapped);
+        pcl::PointCloud<PointType>::Ptr tf_cloud;
+        tf_cloud = transformPointCloud(laserCloudSurfLast,  &temp_pose);
+        publishCloud(&imu_pre_int_debug_transformed_cloud, tf_cloud, timeLaserInfoStamp, odometryFrame);
+
         return;
     }
 }
@@ -1108,6 +1115,9 @@ void mapOptimization::scan2MapOptimization()
 
             if (LMOptimization(iterCount) == true)
                 break;              
+
+            if(iterCount == LMOMaxIterations-1)
+                loam_converged = false;
         }
 
         transformUpdate();
@@ -1170,8 +1180,6 @@ bool mapOptimization::saveFrame()
     float x, y, z, roll, pitch, yaw;
     pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
     
-    loam_yaw_estimation = yaw;
-
     if (abs(roll)  < surroundingkeyframeAddingAngleThreshold &&
         abs(pitch) < surroundingkeyframeAddingAngleThreshold && 
         abs(yaw)   < surroundingkeyframeAddingAngleThreshold &&
@@ -1343,9 +1351,9 @@ void mapOptimization::saveKeyFramesAndFactor()
     thisPose3D.x = latestEstimate.translation().x();
     thisPose3D.y = latestEstimate.translation().y();
     thisPose3D.z = latestEstimate.translation().z();
-    thisPose3D.x = transformTobeMapped[3];
-    thisPose3D.y = transformTobeMapped[4];
-    thisPose3D.z = transformTobeMapped[5];
+    // thisPose3D.x = transformTobeMapped[3];
+    // thisPose3D.y = transformTobeMapped[4];
+    // thisPose3D.z = transformTobeMapped[5];
     thisPose3D.intensity = cloudKeyPoses3D->size(); // this can be used as index
     cloudKeyPoses3D->push_back(thisPose3D);
 
@@ -1361,28 +1369,6 @@ void mapOptimization::saveKeyFramesAndFactor()
     // thisPose6D.yaw   = transformTobeMapped[2];
     thisPose6D.time = timeLaserInfoCur;
     cloudKeyPoses6D->push_back(thisPose6D);
-
-    if(cloudKeyPoses6D->size() > 1)
-    {
-        Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->points[cloudKeyPoses6D->size()-2]);
-        Eigen::Affine3f transFinal = pclPointToAffine3f(thisPose6D);
-        Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
-        float x, y, z, roll, pitch;
-        pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, isam_yaw_estimation);
-
-        if(abs(imu_pre_yaw_estimation - loam_yaw_estimation) > 0.07)
-        {
-            cout << "Yaw estimations:\n"
-                << "pre-int=" << imu_pre_yaw_estimation * 180.0 / 3.14 << endl
-                << "loam=" << loam_yaw_estimation * 180.0 / 3.14 << endl
-                << "isam=" << isam_yaw_estimation * 180.0 / 3.14 << endl;
-
-            string temp;
-            cin >> temp;
-            if(temp == "end")
-                std::terminate();
-        }
-    }
 
     // cout << "****************************************************" << endl;
     // cout << "Pose covariance:" << endl;
@@ -1570,4 +1556,83 @@ void mapOptimization::publishFrames()
         pubPath.publish(globalPath);
         // 
     }
+}
+
+void mapOptimization::debug()
+{
+    cout << "Iteration: " << cloudKeyPoses6D->size() << endl;
+
+    if(!cloudInfo.odomAvailable && cloudInfo.imuAvailable)
+        ROS_WARN("No IMU odometery availbale, estimating rotation only.");
+    
+    if(!cloudInfo.odomAvailable && !cloudInfo.imuAvailable)
+        ROS_ERROR("No IMU odometery nor relative rotation availbale.");
+
+    // Publish cloud with loam optimized transform
+    PointTypePose thisPose6D = trans2PointTypePose(transformTobeMapped);
+    pcl::PointCloud<PointType>::Ptr tf_cloud;
+    tf_cloud = transformPointCloud(laserCloudSurfLast,  &thisPose6D);
+    publishCloud(&loam_debug_transformed_cloud, tf_cloud, timeLaserInfoStamp, odometryFrame);
+
+    // Calculating incremental odometry post loam optimization & pre ISAM
+    Eigen::Affine3f affineIncre = incrementalOdometryAffineFront.inverse() * incrementalOdometryAffineBack;
+    pcl::getTranslationAndEulerAngles (affineIncre, loam_inc[0], loam_inc[1], loam_inc[2], loam_inc[3], loam_inc[4], loam_inc[5]);
+
+    float delta_x = imu_pre_inc[0] - loam_inc[0];
+    float delta_y = imu_pre_inc[1] - loam_inc[1];
+    float delta_yaw = imu_pre_inc[5] - loam_inc[5];
+
+    // Publish the diffrent yaw estimations for plotting
+    std_msgs::Float64MultiArray delta_estimation;
+    
+    delta_estimation.data.push_back(delta_x);
+    delta_estimation.data.push_back(delta_y);
+    delta_estimation.data.push_back(imu_pre_inc[2] - loam_inc[2]);  // delta z
+    delta_estimation.data.push_back(imu_pre_inc[3] - loam_inc[3]);  // delta roll
+    delta_estimation.data.push_back(imu_pre_inc[4] - loam_inc[4]);  // delta pitch
+    delta_estimation.data.push_back(delta_yaw);
+
+    deltaEstimation.publish(delta_estimation);
+    
+    bool pause = false;
+
+    if(sqrt(pow(delta_x, 2) + pow(delta_y, 2)) >= 0.5 || delta_yaw >= 0.09)
+    {
+        ROS_WARN("*-* High linear/angular motion *-*");
+        cout << "Incremental estimations: x, y, yaw\n"
+            << "pre-int: " << imu_pre_inc[0] << ", " << imu_pre_inc[1] << ", " << imu_pre_inc[5] * 180.0 / 3.14 << endl
+            << "loam: " <<  loam_inc[0] << ", " << loam_inc[1] << ", " << loam_inc[5] * 180.0 / 3.14 << endl;
+
+        pause = true;
+    }
+
+    if(!loam_converged)
+    {
+        ROS_WARN("*-* LOAM didn't converge *-*");
+        loam_converged = true;
+        pause = true;
+
+        cout << "Absolute estimations: x, y, yaw\n";
+
+        float x, y, z, roll, pitch, yaw;
+        pcl::getTranslationAndEulerAngles(incrementalOdometryAffineFront, x, y, z, roll, pitch, yaw);
+        cout << "Initial pose: " << x << ", " << y << ", " << yaw * 180.0 / 3.14 << endl;
+
+        pcl::getTranslationAndEulerAngles(incrementalPreIntAffineBack, x, y, z, roll, pitch, yaw);
+        cout << "IMU pre tf: " << x << ", " << y << ", " << yaw * 180.0 / 3.14 << endl;
+
+        pcl::getTranslationAndEulerAngles(incrementalOdometryAffineBack, x, y, z, roll, pitch, yaw);
+        cout << "LOAM Opt tf: " << x << ", " << y << ", " << yaw * 180.0 / 3.14 << endl;
+    }
+
+    if(pause)
+    {
+        pause = false;
+        string temp;
+        cin >> temp;
+        if(temp == "end")
+            std::terminate(); 
+    }
+
+    cout << "*************************\n\n";
 }
