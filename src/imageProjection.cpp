@@ -252,7 +252,7 @@ void ImageProjection::odomDeskewInfo()
 
     while (!odomQueue.empty())
     {
-        if (odomQueue.front().header.stamp.toSec() < timeScanCur - 0.01)
+        if (odomQueue.front().header.stamp.toSec() < timeScanCur - 0.1)  // 0.01 
             odomQueue.pop_front();
         else
             break;
